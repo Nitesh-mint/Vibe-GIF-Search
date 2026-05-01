@@ -76,17 +76,46 @@ function renderRecents() {
     img.draggable = true;
     img.title = gif.title;
 
-    img.addEventListener("dragstart", (e) => {
-      e.dataTransfer.setData("text/uri-list", gif.original);
-      e.dataTransfer.setData("text/plain", gif.original);
-      e.dataTransfer.effectAllowed = "copy";
-      recordRecentSlim(gif);
-    });
+    // Pre-fetch blob so drag is synchronous, same as main results
+    fetch(gif.original)
+      .then((res) => res.blob())
+      .then((blob) => {
+        const file = new File([blob], `${gif.slug || gif.id}.gif`, { type: "image/gif" });
+        blobCache.set(gif.id, file);
+      })
+      .catch((err) => console.warn("Recent pre-fetch failed for", gif.id, err));
 
-    img.addEventListener("click", () => {
-      navigator.clipboard.writeText(gif.original);
-      statusDiv.innerText = "link copied!";
+    img.addEventListener("click", async () => {
       recordRecentSlim(gif);
+      const file = blobCache.get(gif.id);
+      if (file) {
+        try {
+          const blob = new Blob([file], { type: "image/gif" });
+          await navigator.clipboard.write([
+            new ClipboardItem({ "image/gif": blob })
+          ]);
+          statusDiv.innerText = "GIF copied! Paste into Teams ✓";
+        } catch (gifErr) {
+          try {
+            const bitmap = await createImageBitmap(file);
+            const canvas = document.createElement("canvas");
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            canvas.getContext("2d").drawImage(bitmap, 0, 0);
+            const pngBlob = await new Promise(res => canvas.toBlob(res, "image/png"));
+            await navigator.clipboard.write([
+              new ClipboardItem({ "image/png": pngBlob })
+            ]);
+            statusDiv.innerText = "Image copied (static)! Paste into Teams ✓";
+          } catch (pngErr) {
+            navigator.clipboard.writeText(gif.original);
+            statusDiv.innerText = "Link copied to clipboard!";
+          }
+        }
+      } else {
+        navigator.clipboard.writeText(gif.original);
+        statusDiv.innerText = "Link copied to clipboard!";
+      }
     });
 
     recentsDiv.appendChild(img);
@@ -226,108 +255,76 @@ async function searchGiphy(keywords, key, offset = 0) {
 }
 
 // --- Display ---
-
 function displayGifs(gifs, isAppend = false) {
-  if (!isAppend) resultsDiv.innerHTML = "";
+  if (!isAppend) {
+    resultsDiv.innerHTML = "";
+  }
 
   gifs.forEach((gif) => {
-    const wrap = document.createElement("div");
-    wrap.className = "gif-wrap";
-
     const img = document.createElement("img");
     img.src = gif.images.fixed_width.url;
-    img.alt = gif.title;
-    img.draggable = false;
+    img.className = "gif-item";
+    img.draggable = true;
 
-    const hint = document.createElement("div");
-    hint.className = "drag-hint";
-    hint.textContent = "drag or click";
+    // Pre-fetch the GIF blob in the background so dragstart stays synchronous
+    fetch(gif.images.original.url)
+      .then((res) => res.blob())
+      .then((blob) => {
+        const file = new File([blob], `${gif.slug}.gif`, { type: "image/gif" });
+        blobCache.set(gif.id, file);
+      })
+      .catch((err) => console.warn("Pre-fetch failed for", gif.id, err));
 
-    wrap.appendChild(img);
-    wrap.appendChild(hint);
-    resultsDiv.appendChild(wrap);
-
-    // Ghost element for custom drag visual
-    let ghostEl = null;
-
-    wrap.addEventListener("mousedown", (e) => {
-      if (e.button !== 0) return;
-      const startX = e.clientX;
-      const startY = e.clientY;
-      let dragStarted = false;
-
-      const onMouseMove = (e) => {
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-
-        if (!dragStarted && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
-          dragStarted = true;
-          wrap.classList.add("is-dragging");
-          hint.textContent = "dragging...";
-          hint.style.transform = "translateY(0)";
-
-          ghostEl = document.createElement("img");
-          ghostEl.src = gif.images.fixed_width.url;
-          ghostEl.className = "drag-ghost";
-          ghostEl.style.width = wrap.offsetWidth + "px";
-          document.body.appendChild(ghostEl);
-        }
-
-        if (ghostEl) {
-          ghostEl.style.left = e.clientX - wrap.offsetWidth / 2 + "px";
-          ghostEl.style.top = e.clientY - 20 + "px";
-        }
-      };
-
-      const onMouseUp = () => {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-        if (ghostEl) {
-          ghostEl.remove();
-          ghostEl = null;
-        }
-        wrap.classList.remove("is-dragging");
-        hint.textContent = "drag or click";
-        hint.style.transform = "";
-      };
-
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
-    });
-
-    wrap.setAttribute("draggable", "true");
-
-    wrap.addEventListener("dragstart", (e) => {
+    // Drag: attach the pre-fetched file — synchronous, so dataTransfer works
+    img.addEventListener("dragstart", (e) => {
+      const file = blobCache.get(gif.id);
       const gifUrl = gif.images.original.url;
+
       e.dataTransfer.setData("text/uri-list", gifUrl);
       e.dataTransfer.setData("text/plain", gifUrl);
+      e.dataTransfer.setData("DownloadURL", `image/gif:${gif.slug}.gif:${gifUrl}`);
+      if (file) e.dataTransfer.items.add(file);
       e.dataTransfer.effectAllowed = "copy";
 
-      wrap.classList.add("is-dragging");
-      hint.textContent = "drop it!";
-      hint.style.transform = "translateY(0)";
-
       recordRecent(gif);
     });
 
-    wrap.addEventListener("dragend", () => {
-      wrap.classList.remove("is-dragging");
-      hint.textContent = "drag or click";
-      hint.style.transform = "";
-    });
+    // Click: copy to clipboard and record recent
+    img.onclick = async () => {
+      recordRecent(gif); // ← record on click
 
-    wrap.addEventListener("click", () => {
-      navigator.clipboard.writeText(gif.images.original.url);
-      hint.textContent = "link copied!";
-      hint.style.transform = "translateY(0)";
-      wrap.classList.add("copied");
-      setTimeout(() => {
-        hint.textContent = "drag or click";
-        hint.style.transform = "";
-        wrap.classList.remove("copied");
-      }, 1500);
-      recordRecent(gif);
-    });
+      const file = blobCache.get(gif.id);
+      if (file) {
+        try {
+          const blob = new Blob([file], { type: "image/gif" });
+          await navigator.clipboard.write([
+            new ClipboardItem({ "image/gif": blob })
+          ]);
+          statusDiv.innerText = "GIF copied! Paste into Teams ✓";
+        } catch (gifErr) {
+          try {
+            const bitmap = await createImageBitmap(file);
+            const canvas = document.createElement("canvas");
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            canvas.getContext("2d").drawImage(bitmap, 0, 0);
+            const pngBlob = await new Promise(res => canvas.toBlob(res, "image/png"));
+            await navigator.clipboard.write([
+              new ClipboardItem({ "image/png": pngBlob })
+            ]);
+            statusDiv.innerText = "Image copied (static)! Paste into Teams ✓";
+          } catch (pngErr) {
+            navigator.clipboard.writeText(gif.images.original.url);
+            statusDiv.innerText = "Link copied to clipboard!";
+          }
+        }
+      } else {
+        navigator.clipboard.writeText(gif.images.original.url);
+        statusDiv.innerText = "Link copied to clipboard!";
+      }
+    };
+
+    resultsDiv.appendChild(img);
   });
 }
 
