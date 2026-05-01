@@ -1,166 +1,245 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    :root {
-      --bg: #ffffff;
-      --text: #1a1a1a;
-      --text-dim: #666666;
-      --accent: #6366f1;
-      --input-bg: #f3f4f6;
-      --border: #e5e7eb;
-      --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-      --font-main: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    @media (prefers-color-scheme: dark) {
+  <head>
+    <meta charset="UTF-8" />
+    <style>
       :root {
-        --bg: #0f172a;
-        --text: #f8fafc;
-        --text-dim: #94a3b8;
-        --accent: #818cf8;
-        --input-bg: #1e293b;
-        --border: #334155;
-        --card-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+        --bg: #ffffff;
+        --text: #1a1a1a;
+        --text-dim: #666666;
+        --accent: #6366f1;
+        --input-bg: #f3f4f6;
+        --border: #e5e7eb;
+        --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        --font-main: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       }
-    }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f172a;
+          --text: #f8fafc;
+          --text-dim: #94a3b8;
+          --accent: #818cf8;
+          --input-bg: #1e293b;
+          --border: #334155;
+          --card-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+        }
+      }
+      body {
+        width: 340px;
+        font-family: var(--font-main);
+        background: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 20px;
+        transition:
+          background-color 0.3s ease,
+          color 0.3s ease;
+      }
+      h3 {
+        margin: 0 0 16px 0;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        font-size: 1.25rem;
+        background: linear-gradient(to right, var(--accent), #ec4899);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .status {
+        font-size: 11px;
+        color: var(--text-dim);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+      }
+      input {
+        width: 100%;
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--input-bg);
+        color: var(--text);
+        outline: none;
+        margin-bottom: 16px;
+        box-sizing: border-box;
+        font-size: 14px;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+      input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+      }
 
-    body { 
-      width: 340px; 
-      font-family: var(--font-main); 
-      background: var(--bg); 
-      color: var(--text); 
-      margin: 0;
-      padding: 20px;
-      transition: background-color 0.3s ease, color 0.3s ease;
-    }
+      /* Recents */
+      #recents-section {
+        display: none;
+        margin-bottom: 16px;
+      }
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .section-label {
+        font-size: 11px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+      }
+      .clear-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        width: auto;
+        font-size: 11px;
+        color: var(--text-dim);
+        cursor: pointer;
+        font-weight: 500;
+        transition: color 0.2s;
+      }
+      .clear-btn:hover {
+        color: #ef4444;
+        opacity: 1;
+      }
+      #recents {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 6px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border) transparent;
+      }
+      #recents::-webkit-scrollbar {
+        height: 3px;
+      }
+      #recents::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 10px;
+      }
+      .recent-item {
+        flex: 0 0 72px;
+        height: 72px;
+        border-radius: 8px;
+        object-fit: cover;
+        cursor: pointer;
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+        box-shadow: var(--card-shadow);
+        border: 2px solid transparent;
+        draggable: true;
+      }
+      .recent-item:hover {
+        transform: scale(1.06);
+        border-color: var(--accent);
+      }
 
-    h3 {
-      margin: 0 0 16px 0;
-      font-weight: 700;
-      letter-spacing: -0.025em;
-      font-size: 1.25rem;
-      background: linear-gradient(to right, var(--accent), #ec4899);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
+      /* Results */
+      #results {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        max-height: 380px;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+      #results::-webkit-scrollbar {
+        width: 4px;
+      }
+      #results::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      #results::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 10px;
+      }
+      .gif-item {
+        width: 100%;
+        border-radius: 8px;
+        cursor: pointer;
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+        box-shadow: var(--card-shadow);
+        display: block;
+      }
+      .gif-item:hover {
+        transform: scale(1.03);
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.2);
+      }
+      #settings {
+        margin-top: 20px;
+        border-top: 1px solid var(--border);
+        padding-top: 16px;
+      }
+      button {
+        width: 100%;
+        padding: 12px;
+        border-radius: 12px;
+        border: none;
+        background: var(--accent);
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+      button:hover {
+        opacity: 0.9;
+      }
+      .settings-link {
+        display: block;
+        text-align: center;
+        margin-top: 16px;
+        color: var(--text-dim);
+        font-size: 12px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.2s;
+      }
+      .settings-link:hover {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Vibe GIF Search</h3>
+    <div class="status" id="status">Ready</div>
+    <input
+      type="text"
+      id="query"
+      placeholder="Describe the vibe..."
+      autofocus
+    />
 
-    .status { 
-      font-size: 11px; 
-      color: var(--text-dim); 
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-weight: 600;
-    }
+    <div id="recents-section">
+      <div class="section-header">
+        <span class="section-label">Recently used</span>
+        <button class="clear-btn" id="clear-recents">Clear</button>
+      </div>
+      <div id="recents"></div>
+    </div>
 
-    input { 
-      width: 100%; 
-      padding: 12px 16px; 
-      border-radius: 12px; 
-      border: 1px solid var(--border); 
-      background: var(--input-bg);
-      color: var(--text);
-      outline: none; 
-      margin-bottom: 16px; 
-      box-sizing: border-box;
-      font-size: 14px;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
+    <div id="results"></div>
 
-    input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-    }
+    <div id="settings" style="display: none">
+      <div class="status" style="margin-bottom: 12px">Settings</div>
+      <input
+        type="password"
+        id="gemini_key_input"
+        placeholder="Gemini API Key"
+      />
+      <input type="password" id="giphy_key_input" placeholder="GIPHY API Key" />
+      <button id="save_keys">Save Keys</button>
+    </div>
 
-    #results { 
-      display: grid; 
-      grid-template-columns: 1fr 1fr; 
-      gap: 12px; 
-      max-height: 380px; 
-      overflow-y: auto;
-      padding-right: 4px;
-    }
+    <a href="#" id="toggle_settings" class="settings-link"
+      >Configure API Keys</a
+    >
 
-    #results::-webkit-scrollbar {
-      width: 4px;
-    }
-    #results::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    #results::-webkit-scrollbar-thumb {
-      background: var(--border);
-      border-radius: 10px;
-    }
-
-    .gif-item { 
-      width: 100%; 
-      border-radius: 8px; 
-      cursor: pointer; 
-      transition: transform 0.2s, box-shadow 0.2s;
-      box-shadow: var(--card-shadow);
-      display: block;
-    }
-
-    .gif-item:hover {
-      transform: scale(1.03);
-      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.2);
-    }
-
-    #settings { 
-      margin-top: 20px; 
-      border-top: 1px solid var(--border); 
-      padding-top: 16px; 
-    }
-
-    button {
-      width: 100%; 
-      padding: 12px; 
-      border-radius: 12px; 
-      border: none; 
-      background: var(--accent); 
-      color: white; 
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-
-    button:hover {
-      opacity: 0.9;
-    }
-
-    .settings-link {
-      display: block;
-      text-align: center;
-      margin-top: 16px;
-      color: var(--text-dim);
-      font-size: 12px;
-      text-decoration: none;
-      font-weight: 500;
-      transition: color 0.2s;
-    }
-
-    .settings-link:hover {
-      color: var(--accent);
-    }
-  </style>
-</head>
-<body>
-  <h3>Vibe GIF Search</h3>
-  <div class="status" id="status">Ready</div>
-  <input type="text" id="query" placeholder="Describe the vibe..." autofocus>
-  <div id="results"></div>
-
-  <div id="settings" style="display: none;">
-    <div class="status" style="margin-bottom: 12px;">Settings</div>
-    <input type="password" id="gemini_key_input" placeholder="Gemini API Key">
-    <input type="password" id="giphy_key_input" placeholder="GIPHY API Key">
-    <button id="save_keys">Save Keys</button>
-  </div>
-  
-  <a href="#" id="toggle_settings" class="settings-link">Configure API Keys</a>
-  
-  <script src="popup.js"></script>
-</body>
+    <script src="popup.js"></script>
+  </body>
 </html>

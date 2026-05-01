@@ -136,6 +136,84 @@
         }
       }
 
+      /* Recents */
+      #recents-section {
+        display: none;
+        margin-bottom: 14px;
+        border: var(--border);
+        box-shadow: var(--shadow);
+      }
+
+      .recents-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 5px 8px;
+        border-bottom: var(--border);
+        background: var(--black);
+      }
+
+      .recents-label {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 13px;
+        letter-spacing: 1.5px;
+        color: var(--yellow);
+      }
+
+      .clear-btn {
+        background: none;
+        border: none;
+        width: auto;
+        padding: 0;
+        font-family: "Space Mono", monospace;
+        font-size: 9px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: #888;
+        cursor: pointer;
+        transition: color 0.15s;
+      }
+
+      .clear-btn:hover {
+        color: var(--red);
+        opacity: 1;
+      }
+
+      #recents {
+        display: flex;
+        gap: 0;
+        overflow-x: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--black) var(--white);
+      }
+
+      #recents::-webkit-scrollbar {
+        height: 3px;
+      }
+      #recents::-webkit-scrollbar-thumb {
+        background: var(--black);
+      }
+
+      .recent-item {
+        flex: 0 0 80px;
+        height: 60px;
+        object-fit: cover;
+        cursor: pointer;
+        border-right: var(--border);
+        display: block;
+        transition: opacity 0.15s;
+        filter: saturate(0.8);
+      }
+
+      .recent-item:last-child {
+        border-right: none;
+      }
+      .recent-item:hover {
+        opacity: 0.8;
+        filter: saturate(1.2);
+      }
+
+      /* Results */
       #results {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -324,7 +402,6 @@
         background: var(--yellow);
         color: #0a0a0a;
       }
-
       .load-more-btn:active {
         transform: translate(2px, 2px);
         box-shadow: none;
@@ -343,6 +420,14 @@
       <div class="search-wrap">
         <input type="text" id="query" placeholder="describe the vibe..." />
         <button class="search-btn" id="search-btn">GO</button>
+      </div>
+
+      <div id="recents-section">
+        <div class="recents-header">
+          <span class="recents-label">Recently Used</span>
+          <button class="clear-btn" id="clear-recents">clear</button>
+        </div>
+        <div id="recents"></div>
       </div>
 
       <div id="results"></div>
