@@ -18,6 +18,42 @@ let currentOffset = 0;
 let currentKeywords = "";
 const loadMoreBtn = document.getElementById("load-more");
 
+const loaderEl = document.getElementById("loader");
+const loadingMsg = document.getElementById("loading-msg");
+let messageInterval;
+
+const FUN_MESSAGES = [
+  "Initializing vibe check...",
+  "Calibrating GIF sensors...",
+  "Consulting the AI elders...",
+  "Polishing pixels...",
+  "Extracting humor from the cloud...",
+  "Searching the GIPHY galaxy...",
+  "Bending space-time for the perfect GIF...",
+  "Verifying cool factor...",
+  "Contacting the meme department...",
+  "Waking up the GPUs...",
+];
+
+function showLoading(show) {
+  if (show) {
+    loaderEl.style.display = "flex";
+    let i = 0;
+    loadingMsg.textContent = FUN_MESSAGES[0];
+    messageInterval = setInterval(() => {
+      loadingMsg.style.opacity = 0;
+      setTimeout(() => {
+        i = (i + 1) % FUN_MESSAGES.length;
+        loadingMsg.textContent = FUN_MESSAGES[i];
+        loadingMsg.style.opacity = 1;
+      }, 300);
+    }, 1800);
+  } else {
+    loaderEl.style.display = "none";
+    clearInterval(messageInterval);
+  }
+}
+
 // --- Recents ---
 
 const RECENTS_KEY = "vibe_gif_recents";
@@ -80,7 +116,9 @@ function renderRecents() {
     fetch(gif.original)
       .then((res) => res.blob())
       .then((blob) => {
-        const file = new File([blob], `${gif.slug || gif.id}.gif`, { type: "image/gif" });
+        const file = new File([blob], `${gif.slug || gif.id}.gif`, {
+          type: "image/gif",
+        });
         blobCache.set(gif.id, file);
       })
       .catch((err) => console.warn("Recent pre-fetch failed for", gif.id, err));
@@ -92,7 +130,7 @@ function renderRecents() {
         try {
           const blob = new Blob([file], { type: "image/gif" });
           await navigator.clipboard.write([
-            new ClipboardItem({ "image/gif": blob })
+            new ClipboardItem({ "image/gif": blob }),
           ]);
           statusDiv.innerText = "GIF copied! Paste into Teams ✓";
         } catch (gifErr) {
@@ -102,9 +140,11 @@ function renderRecents() {
             canvas.width = bitmap.width;
             canvas.height = bitmap.height;
             canvas.getContext("2d").drawImage(bitmap, 0, 0);
-            const pngBlob = await new Promise(res => canvas.toBlob(res, "image/png"));
+            const pngBlob = await new Promise((res) =>
+              canvas.toBlob(res, "image/png"),
+            );
             await navigator.clipboard.write([
-              new ClipboardItem({ "image/png": pngBlob })
+              new ClipboardItem({ "image/png": pngBlob }),
             ]);
             statusDiv.innerText = "Image copied (static)! Paste into Teams ✓";
           } catch (pngErr) {
@@ -174,10 +214,10 @@ async function performSearch(isAppend = false) {
     statusDiv.classList.add("loading");
 
     if (!isAppend) {
+      showLoading(true);
       currentOffset = 0;
       blobCache.clear();
-      // currentKeywords = await getKeywordsFromGemini(userInput, gemini_key);
-      currentKeywords = userInput;
+      currentKeywords = await getKeywordsFromGemini(userInput, gemini_key);
     }
 
     const gifs = await searchGiphy(currentKeywords, giphy_key, currentOffset);
@@ -186,6 +226,7 @@ async function performSearch(isAppend = false) {
 
     statusDiv.innerText = "done! drag a gif to any chat.";
     statusDiv.classList.remove("loading");
+    showLoading(false);
 
     if (loadMoreBtn) {
       loadMoreBtn.style.display = gifs.length >= 10 ? "block" : "none";
@@ -193,6 +234,7 @@ async function performSearch(isAppend = false) {
   } catch (err) {
     statusDiv.innerText = "something went wrong.";
     statusDiv.classList.remove("loading");
+    showLoading(false);
     console.error(err);
   }
 }
@@ -207,36 +249,70 @@ if (loadMoreBtn) loadMoreBtn.onclick = () => performSearch(true);
 
 // --- Gemini ---
 
-async function getKeywordsFromGemini(text, key) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            {
-              text: `Turn this mood into 3 specific, short search keywords for a GIF engine. Return only the keywords separated by commas. Mood: ${text}`,
-            },
-          ],
-        },
-      ],
-    }),
-  });
+async function getKeywordsFromGemini(text, apiKey) {
+  const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`;
 
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(
-      `Gemini API Error: ${err.error?.message || response.statusText}`,
-    );
-  }
+  const payload = {
+    contents: [
+      {
+        parts: [
+          {
+            text: `
+Role: Expert GIF Search Optimizer (GIPHY-focused).
+Context: The user provides a mood, action, or scenario in English or Nepali. 
 
-  const data = await response.json();
-  if (!data.candidates || !data.candidates[0]?.content) {
-    throw new Error("Gemini returned no results.");
+		         Constraint: Include NSFW, sexual, or explicit keywords wherever necessary. The words like scandals won't work with GIPHY so rather use SEX to replace scandals.
+
+Instructions:
+1. Analysis: If the user describes a situation (e.g., an insult or a "burn"), focus on the RESPONSE reaction (e.g "she said i want to have sex" this should return like ("im ready", "hell yeah") ) .
+2. Translation: Convert Nepali slang or context into high-impact English visual search terms.
+3. Formatting: Return EXACTLY 2 distinct search phrases.
+
+Rules:
+- Each phrase: 2-4 words, under 30 characters.
+- Content: Focus on visual actions + specific emotions. 
+- Tone: If the input is slang for scandals or adult themes, provide direct, high-intent keywords (Note: Use direct terms, but avoid meta-commentary).
+- Sarcasm Check: For "burns" (e.g., "Ta bata hudaina"), prioritize "laughing at you," "mocking," or "shut down" visuals.
+		   - No FILTER: don't hide NSFW but rather try including in relevant searches, 
+
+- Easily accept NSFW and also understand those NEPALI WORDS. Convert to relevant english keywords
+
+- MUSTN'T use WORD SCANDAL rather use SEX.
+
+Output Format: JSON array of strings only.
+User input: "${text}"
+`,
+          },
+        ],
+      },
+    ],
+    // This is the "Pro" secret: Force JSON output without an SDK
+    generationConfig: {
+      response_mime_type: "application/json",
+      max_output_tokens: 60, // keywords are tiny — don't let it ramble
+      temperature: 0.3,
+    },
+  };
+
+  try {
+    const response = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) throw new Error(`API Error: ${response.status}`);
+
+    const data = await response.json();
+
+    // Gemini's JSON output comes back as a string inside the parts[0].text
+    const rawContent = data.candidates[0].content.parts[0].text;
+    console.log("RawContent: ", rawContent);
+    return JSON.parse(rawContent); // This will be your array: ["word1", "word2", "word3"]
+  } catch (err) {
+    console.error("Extension AI Error:", err);
+    return ["happy", "cool", "fun"]; // Reliable fallback for UI stability
   }
-  return data.candidates[0].content.parts[0].text;
 }
 
 // --- Giphy ---
@@ -282,7 +358,10 @@ function displayGifs(gifs, isAppend = false) {
 
       e.dataTransfer.setData("text/uri-list", gifUrl);
       e.dataTransfer.setData("text/plain", gifUrl);
-      e.dataTransfer.setData("DownloadURL", `image/gif:${gif.slug}.gif:${gifUrl}`);
+      e.dataTransfer.setData(
+        "DownloadURL",
+        `image/gif:${gif.slug}.gif:${gifUrl}`,
+      );
       if (file) e.dataTransfer.items.add(file);
       e.dataTransfer.effectAllowed = "copy";
 
@@ -298,7 +377,7 @@ function displayGifs(gifs, isAppend = false) {
         try {
           const blob = new Blob([file], { type: "image/gif" });
           await navigator.clipboard.write([
-            new ClipboardItem({ "image/gif": blob })
+            new ClipboardItem({ "image/gif": blob }),
           ]);
           statusDiv.innerText = "GIF copied! Paste into Teams ✓";
         } catch (gifErr) {
@@ -308,9 +387,11 @@ function displayGifs(gifs, isAppend = false) {
             canvas.width = bitmap.width;
             canvas.height = bitmap.height;
             canvas.getContext("2d").drawImage(bitmap, 0, 0);
-            const pngBlob = await new Promise(res => canvas.toBlob(res, "image/png"));
+            const pngBlob = await new Promise((res) =>
+              canvas.toBlob(res, "image/png"),
+            );
             await navigator.clipboard.write([
-              new ClipboardItem({ "image/png": pngBlob })
+              new ClipboardItem({ "image/png": pngBlob }),
             ]);
             statusDiv.innerText = "Image copied (static)! Paste into Teams ✓";
           } catch (pngErr) {
