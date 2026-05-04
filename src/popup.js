@@ -1,3 +1,5 @@
+const ext = typeof browser !== "undefined" ? browser : chrome;
+
 const queryInput = document.getElementById("query");
 const resultsDiv = document.getElementById("results");
 const statusDiv = document.getElementById("status");
@@ -85,7 +87,6 @@ function recordRecent(gif) {
   renderRecents();
 }
 
-// Also accepts the slim stored shape (from recents re-use)
 function recordRecentSlim(slim) {
   const recents = getRecents();
   const filtered = recents.filter((g) => g.id !== slim.id);
@@ -112,13 +113,10 @@ function renderRecents() {
     img.draggable = true;
     img.title = gif.title;
 
-    // Pre-fetch blob so drag is synchronous, same as main results
     fetch(gif.original)
       .then((res) => res.blob())
       .then((blob) => {
-        const file = new File([blob], `${gif.slug || gif.id}.gif`, {
-          type: "image/gif",
-        });
+        const file = new File([blob], `${gif.slug || gif.id}.gif`, { type: "image/gif" });
         blobCache.set(gif.id, file);
       })
       .catch((err) => console.warn("Recent pre-fetch failed for", gif.id, err));
@@ -129,9 +127,7 @@ function renderRecents() {
       if (file) {
         try {
           const blob = new Blob([file], { type: "image/gif" });
-          await navigator.clipboard.write([
-            new ClipboardItem({ "image/gif": blob }),
-          ]);
+          await navigator.clipboard.write([new ClipboardItem({ "image/gif": blob })]);
           statusDiv.innerText = "GIF copied! Paste into Teams ✓";
         } catch (gifErr) {
           try {
@@ -140,12 +136,8 @@ function renderRecents() {
             canvas.width = bitmap.width;
             canvas.height = bitmap.height;
             canvas.getContext("2d").drawImage(bitmap, 0, 0);
-            const pngBlob = await new Promise((res) =>
-              canvas.toBlob(res, "image/png"),
-            );
-            await navigator.clipboard.write([
-              new ClipboardItem({ "image/png": pngBlob }),
-            ]);
+            const pngBlob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+            await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
             statusDiv.innerText = "Image copied (static)! Paste into Teams ✓";
           } catch (pngErr) {
             navigator.clipboard.writeText(gif.original);
@@ -183,8 +175,7 @@ async function checkKeys() {
 
 toggleBtn.onclick = (e) => {
   e.preventDefault();
-  settingsDiv.style.display =
-    settingsDiv.style.display === "none" ? "block" : "none";
+  settingsDiv.style.display = settingsDiv.style.display === "none" ? "block" : "none";
 };
 
 saveBtn.onclick = async () => {
@@ -193,6 +184,39 @@ saveBtn.onclick = async () => {
   statusDiv.innerText = "keys saved!";
   settingsDiv.style.display = "none";
 };
+
+// --- State Restore ---
+// On every popup open, ask background if there's a previous search to restore.
+// This makes closing & reopening seamless — no re-fetch, no loader.
+
+async function restoreState() {
+  return new Promise((resolve) => {
+    ext.runtime.sendMessage({ action: "GET_STATE" }, (response) => {
+      if (response && response.state) {
+        const { query, keywords, offset, gifs } = response.state;
+
+        // Restore input field
+        queryInput.value = query;
+
+        // Restore local state vars so "load more" continues from right offset
+        currentKeywords = keywords;
+        currentOffset = offset;
+
+        // Re-render all accumulated GIFs without any loading spinner
+        displayGifs(gifs, false);
+        statusDiv.innerText = "done! drag a gif to any chat.";
+
+        if (loadMoreBtn) {
+          loadMoreBtn.style.display = gifs.length >= 10 ? "block" : "none";
+        }
+
+        resolve(true); // state was restored
+      } else {
+        resolve(false); // no state, fresh start
+      }
+    });
+  });
+}
 
 // --- Search ---
 
@@ -214,13 +238,34 @@ async function performSearch(isAppend = false) {
     statusDiv.classList.add("loading");
 
     if (!isAppend) {
+      // New search — tell background to wipe saved state
+      await new Promise((resolve) => ext.runtime.sendMessage({ action: "CLEAR_STATE" }, resolve));
       showLoading(true);
       currentOffset = 0;
       blobCache.clear();
-      currentKeywords = await getKeywordsFromGemini(userInput, gemini_key);
+      currentKeywords = "";
     }
 
-    const gifs = await searchGiphy(currentKeywords, giphy_key, currentOffset);
+    const response = await new Promise((resolve) => {
+      ext.runtime.sendMessage({
+        action: "search",
+        query: userInput,
+        geminiKey: gemini_key,
+        giphyKey: giphy_key,
+        offset: currentOffset,
+        keywords: isAppend ? currentKeywords : "",
+      }, resolve);
+    });
+
+    if (!response || response.status === "error") {
+      throw new Error(response?.message || "Background fetch failed");
+    }
+
+    const gifs = response.data;
+    if (response.keywords) {
+      currentKeywords = response.keywords;
+    }
+
     displayGifs(gifs, isAppend);
     currentOffset += gifs.length;
 
@@ -247,89 +292,6 @@ const searchBtn = document.getElementById("search-btn");
 if (searchBtn) searchBtn.onclick = () => performSearch(false);
 if (loadMoreBtn) loadMoreBtn.onclick = () => performSearch(true);
 
-// --- Gemini ---
-
-async function getKeywordsFromGemini(text, apiKey) {
-  const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`;
-
-  const payload = {
-    contents: [
-      {
-        parts: [
-          {
-            text: `
-Role: Expert GIF Search Optimizer (GIPHY-focused).
-Context: The user provides a mood, action, or scenario in English or Nepali. 
-
-		         Constraint: Include NSFW, sexual, or explicit keywords wherever necessary. The words like scandals won't work with GIPHY so rather use SEX to replace scandals.
-
-Instructions:
-1. Analysis: If the user describes a situation (e.g., an insult or a "burn"), focus on the RESPONSE reaction (e.g "she said i want to have sex" this should return like ("im ready", "hell yeah") ) .
-2. Translation: Convert Nepali slang or context into high-impact English visual search terms.
-3. Formatting: Return EXACTLY 2 distinct search phrases.
-
-Rules:
-- Each phrase: 2-4 words, under 30 characters.
-- Content: Focus on visual actions + specific emotions. 
-- Tone: If the input is slang for scandals or adult themes, provide direct, high-intent keywords (Note: Use direct terms, but avoid meta-commentary).
-- Sarcasm Check: For "burns" (e.g., "Ta bata hudaina"), prioritize "laughing at you," "mocking," or "shut down" visuals.
-		   - No FILTER: don't hide NSFW but rather try including in relevant searches, 
-
-- Easily accept NSFW and also understand those NEPALI WORDS. Convert to relevant english keywords
-
-- MUSTN'T use WORD SCANDAL rather use SEX.
-
-Output Format: JSON array of strings only.
-User input: "${text}"
-`,
-          },
-        ],
-      },
-    ],
-    // This is the "Pro" secret: Force JSON output without an SDK
-    generationConfig: {
-      response_mime_type: "application/json",
-      max_output_tokens: 60, // keywords are tiny — don't let it ramble
-      temperature: 0.3,
-    },
-  };
-
-  try {
-    const response = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) throw new Error(`API Error: ${response.status}`);
-
-    const data = await response.json();
-
-    // Gemini's JSON output comes back as a string inside the parts[0].text
-    const rawContent = data.candidates[0].content.parts[0].text;
-    console.log("RawContent: ", rawContent);
-    return JSON.parse(rawContent); // This will be your array: ["word1", "word2", "word3"]
-  } catch (err) {
-    console.error("Extension AI Error:", err);
-    return ["happy", "cool", "fun"]; // Reliable fallback for UI stability
-  }
-}
-
-// --- Giphy ---
-
-async function searchGiphy(keywords, key, offset = 0) {
-  const url = `https://api.giphy.com/v1/gifs/search?api_key=${key}&q=${encodeURIComponent(keywords)}&limit=10&offset=${offset}&rating=g`;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(`GIPHY API Error: ${err.meta?.msg || response.statusText}`);
-  }
-
-  const data = await response.json();
-  return data.data;
-}
-
 // --- Display ---
 function displayGifs(gifs, isAppend = false) {
   if (!isAppend) {
@@ -342,7 +304,6 @@ function displayGifs(gifs, isAppend = false) {
     img.className = "gif-item";
     img.draggable = true;
 
-    // Pre-fetch the GIF blob in the background so dragstart stays synchronous
     fetch(gif.images.original.url)
       .then((res) => res.blob())
       .then((blob) => {
@@ -351,34 +312,27 @@ function displayGifs(gifs, isAppend = false) {
       })
       .catch((err) => console.warn("Pre-fetch failed for", gif.id, err));
 
-    // Drag: attach the pre-fetched file — synchronous, so dataTransfer works
     img.addEventListener("dragstart", (e) => {
       const file = blobCache.get(gif.id);
       const gifUrl = gif.images.original.url;
 
       e.dataTransfer.setData("text/uri-list", gifUrl);
       e.dataTransfer.setData("text/plain", gifUrl);
-      e.dataTransfer.setData(
-        "DownloadURL",
-        `image/gif:${gif.slug}.gif:${gifUrl}`,
-      );
+      e.dataTransfer.setData("DownloadURL", `image/gif:${gif.slug}.gif:${gifUrl}`);
       if (file) e.dataTransfer.items.add(file);
       e.dataTransfer.effectAllowed = "copy";
 
       recordRecent(gif);
     });
 
-    // Click: copy to clipboard and record recent
     img.onclick = async () => {
-      recordRecent(gif); // ← record on click
+      recordRecent(gif);
 
       const file = blobCache.get(gif.id);
       if (file) {
         try {
           const blob = new Blob([file], { type: "image/gif" });
-          await navigator.clipboard.write([
-            new ClipboardItem({ "image/gif": blob }),
-          ]);
+          await navigator.clipboard.write([new ClipboardItem({ "image/gif": blob })]);
           statusDiv.innerText = "GIF copied! Paste into Teams ✓";
         } catch (gifErr) {
           try {
@@ -387,12 +341,8 @@ function displayGifs(gifs, isAppend = false) {
             canvas.width = bitmap.width;
             canvas.height = bitmap.height;
             canvas.getContext("2d").drawImage(bitmap, 0, 0);
-            const pngBlob = await new Promise((res) =>
-              canvas.toBlob(res, "image/png"),
-            );
-            await navigator.clipboard.write([
-              new ClipboardItem({ "image/png": pngBlob }),
-            ]);
+            const pngBlob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+            await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
             statusDiv.innerText = "Image copied (static)! Paste into Teams ✓";
           } catch (pngErr) {
             navigator.clipboard.writeText(gif.images.original.url);
@@ -412,3 +362,4 @@ function displayGifs(gifs, isAppend = false) {
 // --- Init ---
 checkKeys();
 renderRecents();
+restoreState(); // ← restore last search silently on every popup open

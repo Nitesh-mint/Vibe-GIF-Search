@@ -2,12 +2,17 @@
   "manifest_version": 3,
   "name": "AI Vibe GIF Search",
   "version": "1.0",
-  "permissions": [],
-  "action": {
-    "default_popup": "popup_neo_brutalist.html"
-  },
+  "permissions": [
+    "storage"
+  ],
   "host_permissions": [
     "https://generativelanguage.googleapis.com/*",
     "https://api.giphy.com/*"
-  ]
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup_neo_brutalist.html"
+  }
 }

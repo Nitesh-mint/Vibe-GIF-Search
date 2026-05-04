@@ -23,29 +23,46 @@ Before installing the extension, you must obtain API keys for both Google Gemini
 5. Provide an App Name (e.g., "VibeGIF") and a brief description.
 6. Once the app is created, copy the "API Key" from the dashboard.
 
+## Build Instructions
+
+This project uses browser-specific manifests. You must build the extension before loading it into your browser.
+
+### Linux/macOS
+Run the build script from the project root:
+```bash
+chmod +x build.sh
+./build.sh
+```
+
+### Windows
+Run the PowerShell build script:
+```powershell
+./build.ps1
+```
+
+The build process will generate two directories: `dist/chrome` and `dist/firefox`.
+
 ## Installation
 
 ### Chromium-based Browsers (Chrome, Edge, Brave, Opera)
 
-1. Clone or download this repository to your local machine.
-2. Open your browser and navigate to `chrome://extensions/`.
-3. Enable "Developer mode" using the toggle in the top right corner.
-4. Click the "Load unpacked" button.
-5. Select the directory containing the extension files (the folder where `manifest.json` is located).
-6. The extension will now appear in your toolbar.
+1. Open your browser and navigate to `chrome://extensions/`.
+2. Enable "Developer mode" using the toggle in the top right corner.
+3. Click the "Load unpacked" button.
+4. Select the `dist/chrome` directory generated in the build step.
+5. The extension will now appear in your toolbar.
 
 ### Firefox
 
-1. Clone or download this repository to your local machine.
-2. Open Firefox and navigate to `about:debugging#/runtime/this-firefox`.
-3. Click the "Load Temporary Add-on..." button.
-4. Select the `manifest.json` file from the extension directory.
-5. Note: Temporary add-ons in Firefox are removed when the browser is closed. For permanent installation, the extension must be signed through the Firefox Add-ons (AMO) developer portal.
+1. Open Firefox and navigate to `about:debugging#/runtime/this-firefox`.
+2. Click the "Load Temporary Add-on..." button.
+3. Navigate to the `dist/firefox` directory and select the `manifest.json` file.
+4. Note: Temporary add-ons in Firefox are removed when the browser is closed. For permanent installation, the extension must be signed through the Firefox Add-ons (AMO) developer portal.
 
 ## Configuration
 
 1. Click the AI Vibe GIF Search icon in your browser toolbar.
-2. Click the "Settings" icon or button within the popup.
+2. Click the "// settings" button within the popup.
 3. Enter your Gemini API Key and Giphy API Key in the respective fields.
-4. Click "Save" to store the keys locally.
+4. Click "SAVE" to store the keys locally.
 5. You can now begin searching for GIFs by entering a query or "vibe" description.
