@@ -66,3 +66,20 @@ The build process will generate two directories: `dist/chrome` and `dist/firefox
 3. Enter your Gemini API Key and Giphy API Key in the respective fields.
 4. Click "SAVE" to store the keys locally.
 5. You can now begin searching for GIFs by entering a query or "vibe" description.
+
+## Roadmap & Upcoming Features
+
+### 🟢 User Experience
+- [ ] **Individual History Management**: Add the ability to remove a single GIF from the "Recently Used" section.
+- [ ] **Keyboard Navigation**: Support for arrow keys to navigate and select GIFs.
+- [ ] **Improved Feedback**: Enhanced success/error notifications with better visual cues.
+
+### 🟡 Functional Enhancements
+- [ ] **Persistent Pinning**: A dedicated "Pinned" section for saving favorite GIFs long-term.
+- [ ] **Content Ratings**: Adjustable GIPHY content filters (G, PG, PG-13, R) in settings.
+- [ ] **Multi-Model Support**: Toggle between different Gemini models (Flash/Pro) for query optimization.
+
+### 🔵 Technical
+- [ ] **Storage Sync**: Securely sync API keys and preferences across browser instances.
+- [ ] **Performance**: Optimize GIF preview loading with better lazy-loading and caching.
+- [ ] **Localization**: Support for more languages in the AI prompt and UI.

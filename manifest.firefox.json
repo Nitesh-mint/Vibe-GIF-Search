@@ -1,24 +1,34 @@
 {
-  "manifest_version": 2,
+  "manifest_version": 3,
   "name": "AI Vibe GIF Search",
   "version": "1.0",
   "permissions": [
-    "storage",
+    "storage"
+  ],
+  "host_permissions": [
     "https://generativelanguage.googleapis.com/*",
     "https://api.giphy.com/*"
   ],
   "background": {
     "scripts": [
       "background.js"
-    ],
-    "persistent": true
+    ]
   },
-  "browser_action": {
+  "action": {
     "default_popup": "popup_neo_brutalist.html"
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "vibe-gif-search@extension"
+      "id": "vibe-gif-search-private@extension",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": [
+          "searchTerms"
+        ],
+        "optional": [
+          "technicalAndInteraction"
+        ]
+      }
     }
   }
 }
